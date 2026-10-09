@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nawscope"
+version = "0.1.0"
+description = "NawScope: Arduino oscilloscope and DSP laboratory"
+readme = "../README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "pyserial>=3.5",
+  "PySide6>=6.6",
+  "pyqtgraph>=0.13",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

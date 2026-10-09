@@ -1,0 +1,19 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#include <avr/io.h>
+#include <stdint.h>
+
+#define F_CPU 16000000UL
+#define ADC_CHANNEL_DEFAULT 0
+#define ADC_REFERENCE_DEFAULT 1
+#define ADC_PRESCALER_DEFAULT 64
+#define UART_BAUD_RATE 115200UL
+#define SAMPLE_BUFFER_SIZE 512U
+#define UART_TX_BUFFER_SIZE 128U
+
+#define FILTER_OFF 0U
+#define FILTER_MOVING_AVERAGE 1U
+#define FILTER_FIR 2U
+
+#endif
