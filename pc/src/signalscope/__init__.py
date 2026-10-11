@@ -1,4 +1,4 @@
-"""NawScope package."""
+"""SignalScope package."""
 
 __version__ = "0.1.0"
 
@@ -26,10 +26,12 @@ from .dsp import (
     compute_rms,
     compute_vpp,
     fft_magnitude,
+    moving_average,
+)
+from .signal import (
     generate_multitone,
     generate_noise,
     generate_sine,
     generate_square,
     generate_triangle,
-    moving_average,
 )

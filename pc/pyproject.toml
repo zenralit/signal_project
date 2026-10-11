@@ -3,10 +3,10 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nawscope"
+name = "signalscope"
 version = "0.1.0"
-description = "NawScope: Arduino oscilloscope and DSP laboratory"
-readme = "../README.md"
+description = "SignalScope: Arduino oscilloscope and DSP laboratory"
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "numpy>=1.26",
@@ -14,6 +14,12 @@ dependencies = [
   "PySide6>=6.6",
   "pyqtgraph>=0.13",
 ]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+signalscope = "signalscope.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

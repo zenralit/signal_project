@@ -1,26 +1,21 @@
 #include "adc.h"
 
-#include <avr/interrupt.h>
 #include <avr/io.h>
 
-static volatile uint8_t g_adc_channel = ADC_CHANNEL_DEFAULT;
-static volatile uint8_t g_adc_reference = ADC_REFERENCE_DEFAULT;
-static volatile uint8_t g_adc_prescaler = ADC_PRESCALER_DEFAULT;
-static volatile uint32_t g_adc_sampling_rate_hz = 9600UL;
+static uint8_t g_adc_channel = ADC_CHANNEL_DEFAULT;
 
 void adc_init(uint8_t channel, uint8_t reference, uint8_t prescaler) {
-    g_adc_channel = channel & 0x07U;
-    g_adc_reference = reference & 0x03U;
-    g_adc_prescaler = prescaler;
-
-    ADMUX = (1U << REFS0) | (g_adc_channel & 0x07U);
-    ADCSRA = (1U << ADEN) | (1U << ADSC) | (1U << ADIE);
-    ADCSRA |= (g_adc_prescaler & 0x07U);
-    ADCSRB = 0;
+    g_adc_channel = channel <= 5U ? channel : ADC_CHANNEL_DEFAULT;
+    if (reference > 3U) {
+        reference = ADC_REFERENCE_DEFAULT;
+    }
+    ADMUX = (uint8_t)((reference << REFS0) | g_adc_channel);
+    ADCSRA = (uint8_t)((1U << ADEN) | (1U << ADIE) | (prescaler & 0x07U));
+    ADCSRB = 0U;
 }
 
 void adc_disable(void) {
-    ADCSRA &= ~(1U << ADEN);
+    ADCSRA &= (uint8_t)~(1U << ADEN);
 }
 
 void adc_start_conversion(void) {
@@ -36,15 +31,9 @@ bool adc_is_conversion_complete(void) {
 }
 
 void adc_set_channel(uint8_t channel) {
-    g_adc_channel = channel & 0x07U;
+    if (channel > 5U) {
+        return;
+    }
+    g_adc_channel = channel;
     ADMUX = (ADMUX & 0xF0U) | g_adc_channel;
-}
-
-void adc_set_sampling_rate(uint32_t fs_hz) {
-    g_adc_sampling_rate_hz = fs_hz;
-}
-
-ISR(ADC_vect) {
-    uint16_t value = ADCW;
-    (void)value;
 }

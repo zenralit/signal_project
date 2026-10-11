@@ -7,7 +7,7 @@
 #include "config.h"
 
 void timer_init(void);
-void timer_set_sampling_frequency(uint32_t fs_hz);
+bool timer_set_sampling_frequency(uint32_t fs_hz);
 uint32_t timer_get_sampling_frequency(void);
 void timer_start(void);
 void timer_stop(void);
