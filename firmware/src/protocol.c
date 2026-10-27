@@ -1,7 +1,5 @@
-#include "protocol.h"
-
+#include "protocol.h" 
 #include <string.h>
-
 #include "uart.h"
 
 uint16_t protocol_crc16_ccitt(const uint8_t *data, uint16_t length) {
