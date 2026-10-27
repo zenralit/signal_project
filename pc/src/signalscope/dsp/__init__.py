@@ -2,6 +2,16 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..signal import (
+    generate_chirp,
+    generate_delayed_signal,
+    generate_multitone,
+    generate_noise,
+    generate_sine,
+    generate_square,
+    generate_triangle,
+)
+
 
 def compute_mean(samples: np.ndarray) -> float:
     data = np.asarray(samples, dtype=np.float64)
@@ -111,3 +121,47 @@ def apply_filter(
     if filter_name == "FIR low-pass":
         return fir_lowpass(samples, cutoff_hz, sampling_frequency_hz)
     raise ValueError(f"Unsupported filter: {filter_name}")
+
+
+from .correlation import (
+    CorrelationResult,
+    DelayEstimate,
+    cross_correlate,
+    estimate_delay,
+    normalized_cross_correlate,
+)
+from .spectrogram import (
+    STFTResult,
+    compute_stft,
+    get_window,
+    magnitude_to_db,
+)
+
+__all__ = [
+    "CorrelationResult",
+    "DelayEstimate",
+    "STFTResult",
+    "adc_to_voltage",
+    "apply_filter",
+    "compute_mean",
+    "compute_rms",
+    "compute_stft",
+    "compute_vpp",
+    "cross_correlate",
+    "dominant_frequency",
+    "estimate_delay",
+    "estimate_frequency_zero_crossing",
+    "fft_magnitude",
+    "fir_lowpass",
+    "generate_chirp",
+    "generate_delayed_signal",
+    "generate_multitone",
+    "generate_noise",
+    "generate_sine",
+    "generate_square",
+    "generate_triangle",
+    "get_window",
+    "magnitude_to_db",
+    "moving_average",
+    "normalized_cross_correlate",
+]

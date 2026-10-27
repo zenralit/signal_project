@@ -6,3 +6,4 @@ pc/.venv/
 firmware/build/*.o
 firmware/build/*.elf
 firmware/build/*.hex
+

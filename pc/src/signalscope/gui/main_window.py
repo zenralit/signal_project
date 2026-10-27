@@ -16,9 +16,14 @@ from ..dsp import (
     apply_filter,
     compute_mean,
     compute_rms,
+    compute_stft,
     compute_vpp,
     dominant_frequency,
+    estimate_delay,
     fft_magnitude,
+    generate_delayed_signal,
+    generate_multitone,
+    normalized_cross_correlate,
 )
 from ..protocol import (
     COMMAND_DEVICE_INFO,
@@ -35,8 +40,10 @@ from ..protocol import (
 from ..serial.connection import available_ports, command_frame
 from ..serial.worker import SerialWorker
 from .controls import ControlPanel
+from .correlation import CorrelationView
 from .oscilloscope import OscilloscopeView
 from .spectrum import SpectrumView
+from .spectrogram import SpectrogramView
 
 
 class MainWindow(QMainWindow):
@@ -48,6 +55,8 @@ class MainWindow(QMainWindow):
         self.control = ControlPanel()
         self.scope = OscilloscopeView()
         self.spectrum = SpectrumView()
+        self.spectrogram = SpectrogramView()
+        self.correlation = CorrelationView()
         self.status = QLabel("Ready — select Demo signal or connect Arduino on A0.")
         self.status.setWordWrap(True)
         self.status.setMinimumHeight(25)
@@ -66,6 +75,8 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         tabs.addTab(self.scope, "Oscilloscope")
         tabs.addTab(self.spectrum, "Spectrum analyzer")
+        tabs.addTab(self.spectrogram, "Spectrogram")
+        tabs.addTab(self.correlation, "Cross-correlation")
         metrics_widget = QWidget()
         metrics_layout = QVBoxLayout(metrics_widget)
         metrics_layout.setContentsMargins(8, 2, 8, 2)
@@ -113,6 +124,9 @@ class MainWindow(QMainWindow):
         self.control.cutoff.valueChanged.connect(self._refresh_plots)
         self.control.demo_frequency.valueChanged.connect(self._refresh_plots)
         self.control.waveform.currentTextChanged.connect(self._refresh_plots)
+        self.spectrogram.settings_changed.connect(self._refresh_plots)
+        self.correlation.delay_ms.valueChanged.connect(self._refresh_plots)
+        self.correlation.signal_source.currentTextChanged.connect(self._refresh_plots)
         self._refresh_ports()
         self._source_changed(self.control.source.currentText())
 
@@ -283,8 +297,8 @@ class MainWindow(QMainWindow):
 
     def _append_samples(self, new_samples: np.ndarray) -> None:
         self._samples = np.concatenate((self._samples, np.asarray(new_samples, dtype=np.float64)))
-        if self._samples.size > 1024:
-            self._samples = self._samples[-1024:]
+        if self._samples.size > 8192:
+            self._samples = self._samples[-8192:]
 
     def _handle_packet(self, packet: Packet) -> None:
         if packet.kind == TYPE_ADC_BLOCK:
@@ -319,11 +333,21 @@ class MainWindow(QMainWindow):
             self._set_status(message, error=True)
 
     def _refresh_plots(self) -> None:
+        fs_hz = float(self.control.sampling_rate.value())
+        self.spectrogram.set_sampling_rate(fs_hz)
         if self._samples.size == 0:
             self.scope.update([], [], None)
-            self.spectrum.update([], [], self.control.sampling_rate.value() / 2.0)
+            self.spectrum.update([], [], fs_hz / 2.0)
+            self.spectrogram.update_spectrogram(None)
+            self.correlation.update_signals(
+                np.array([], dtype=np.float64),
+                np.array([], dtype=np.float64),
+                np.array([], dtype=np.float64),
+            )
+            self.correlation.update_correlation(None, None, fs_hz)
+            if self.correlation.signal_source.currentText() == "Synthetic multitone":
+                self._update_synthetic_correlation(fs_hz)
             return
-        fs_hz = float(self.control.sampling_rate.value())
         nyquist_hz = fs_hz / 2.0
         count = self._samples.size
         time_s = np.arange(count, dtype=np.float64) / fs_hz
@@ -343,6 +367,36 @@ class MainWindow(QMainWindow):
         bins, magnitude = fft_magnitude(self._samples, fs_hz, "hann")
         filtered_magnitude = fft_magnitude(filtered, fs_hz, "hann")[1] if filtered is not None else None
         self.spectrum.update(bins, magnitude, nyquist_hz, filtered_magnitude)
+        if count < self.spectrogram.current_window_size:
+            stft = None
+        else:
+            try:
+                stft = compute_stft(
+                    self._samples,
+                    fs_hz,
+                    self.spectrogram.current_window_size,
+                    self.spectrogram.current_hop_size,
+                    self.spectrogram.current_window_name,
+                )
+            except ValueError as exc:
+                stft = None
+                self._set_status(f"Spectrogram configuration error: {exc}", error=True)
+        self.spectrogram.update_spectrogram(stft)
+        if self.correlation.signal_source.currentText() == "Current acquisition":
+            signal_a = self._samples
+            signal_b = generate_delayed_signal(
+                signal_a,
+                round(self.correlation.delay_ms.value() * fs_hz / 1000.0),
+            )
+            self.correlation.update_signals(time_s, signal_a, signal_b)
+            if signal_a.size >= 2 and np.any(signal_a) and np.any(signal_b):
+                estimate = estimate_delay(signal_a, signal_b, fs_hz)
+                correlation = normalized_cross_correlate(signal_a, signal_b)
+                self.correlation.update_correlation(correlation, estimate, fs_hz)
+            else:
+                self.correlation.update_correlation(None, None, fs_hz)
+        else:
+            self._update_synthetic_correlation(fs_hz)
 
         frequency_hz = dominant_frequency(self._samples, fs_hz)
         self.metrics["samples"].setText(f"Samples: {count}")
@@ -354,6 +408,30 @@ class MainWindow(QMainWindow):
         )
         self.metrics["nyquist"].setText(f"Nyquist: {nyquist_hz:.0f} Hz")
         self._update_aliasing_warning(frequency_hz, nyquist_hz)
+
+    def _update_synthetic_correlation(self, sampling_rate_hz: float) -> None:
+        sample_count = 4096
+        duration_s = sample_count / sampling_rate_hz
+        signal_a = generate_multitone(
+            (
+                sampling_rate_hz * 0.07,
+                sampling_rate_hz * 0.19,
+                sampling_rate_hz * 0.31,
+            ),
+            amplitudes=(1.0, 0.55, 0.25),
+            duration_s=duration_s,
+            sampling_frequency_hz=sampling_rate_hz,
+        )
+        delay_samples = round(self.correlation.delay_ms.value() * sampling_rate_hz / 1000.0)
+        signal_b = generate_delayed_signal(signal_a, delay_samples)
+        time_s = np.arange(sample_count, dtype=np.float64) / sampling_rate_hz
+        self.correlation.update_signals(time_s, signal_a, signal_b)
+        if np.any(signal_b):
+            correlation = normalized_cross_correlate(signal_a, signal_b)
+            estimate = estimate_delay(signal_a, signal_b, sampling_rate_hz)
+            self.correlation.update_correlation(correlation, estimate, sampling_rate_hz)
+        else:
+            self.correlation.update_correlation(None, None, sampling_rate_hz)
 
     def _update_aliasing_warning(self, measured_frequency_hz: float, nyquist_hz: float) -> None:
         if self.control.source.currentText() == "Demo signal":

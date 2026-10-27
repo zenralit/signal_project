@@ -1,5 +1,10 @@
 # SignalScope PC application
 
+<p align="center">
+<img src="IMG/main_page.png" width="850">
+</p>
+
+
 The PC package provides the Windows desktop UI, serial protocol client, signal measurements, FFT analysis, and digital filters.
 
 From PowerShell in this directory, install and launch the app with:
@@ -9,4 +14,4 @@ From PowerShell in this directory, install and launch the app with:
 .\run.ps1
 ```
 
-See the repository's top-level README and `docs/CODE_GUIDE.md` for the project model, hardware wiring, serial protocol, DSP theory, and a detailed explanation of the source code.
+Подробное объяснение каждого слоя, исходных файлов, протокола, уравнений DSP и порядка отладки вынесено в отдельную [документацию по коду](docs/CODE_GUIDE.md).
